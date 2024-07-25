@@ -1,0 +1,1 @@
+from src.models.detection.yolo.model import YOLOv4
