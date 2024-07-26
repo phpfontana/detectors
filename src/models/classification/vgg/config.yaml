@@ -1,0 +1,61 @@
+vgg16:
+  features: 
+    [
+      [Conv, [64, 3, 1, 1]],    # 0
+      [BatchNorm, [64]],        # 1
+      [ReLU, []],               # 2
+      [Conv, [64, 3, 1, 1]],    # 3
+      [BatchNorm, [64]],        # 4
+      [ReLU, []],               # 5
+      [MaxPool, [2, 2, 0]],     # 6
+      [Conv, [128, 3, 1, 1]],   # 7
+      [BatchNorm, [128]],       # 8
+      [ReLU, []],               # 9
+      [Conv, [128, 3, 1, 1]],   # 10
+      [BatchNorm, [128]],       # 11
+      [ReLU, []],               # 12
+      [MaxPool, [2, 2, 0]],     # 13
+      [Conv, [256, 3, 1, 1]],   # 14
+      [BatchNorm, [256]],       # 15
+      [ReLU, []],               # 16
+      [Conv, [256, 3, 1, 1]],   # 17
+      [BatchNorm, [256]],       # 18
+      [ReLU, []],               # 19
+      [Conv, [256, 3, 1, 1]],   # 20
+      [BatchNorm, [256]],       # 21
+      [ReLU, []],               # 22
+      [MaxPool, [2, 2, 0]],     # 23
+      [Conv, [512, 3, 1, 1]],   # 24
+      [BatchNorm, [512]],       # 25
+      [ReLU, []],               # 26
+      [Conv, [512, 3, 1, 1]],   # 27
+      [BatchNorm, [512]],       # 28
+      [ReLU, []],               # 29
+      [Conv, [512, 3, 1, 1]],   # 30
+      [BatchNorm, [512]],       # 31
+      [ReLU, []],               # 32
+      [MaxPool, [2, 2, 0]],     # 33
+      [Conv, [512, 3, 1, 1]],   # 34
+      [BatchNorm, [512]],       # 35
+      [ReLU, []],               # 36
+      [Conv, [512, 3, 1, 1]],   # 37
+      [BatchNorm, [512]],       # 38
+      [ReLU, []],               # 39
+      [MaxPool, [2, 2, 0]]      # 40
+    ]
+    
+  avgpool:
+    [
+      [AdaptiveAvgPool, [7, 7]] # 0
+    ]
+    
+  classifier:
+    [
+      [Linear, [4096, 512]],  # 0
+      [ReLU, []],             # 1
+      [Dropout, [0.5]],       # 2
+      [Linear, [4096, 4096]], # 3
+      [ReLU, []],             # 4
+      [Dropout, [0.5]],       # 5
+      [Linear, [1000, 4096]]  # 6
+    ]

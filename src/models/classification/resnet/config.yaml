@@ -1,0 +1,52 @@
+resnet18: 
+  conv1: 
+    [
+      [Conv2d, [64, 3, 7, 2, 3]] # 0
+    ]
+  bn1: 
+    [
+      [BatchNorm2d, [64]] # 0
+    ]
+  relu: 
+    [
+      [ReLU, []] # 0
+    ]
+  maxpool: 
+    [
+      [MaxPool2d, [3, 2, 1]] # 0
+    ]
+
+  layer1: 
+    [
+      [BasicBlock, [64, 64, 2]], # 0
+      [BasicBlock, [64, 64, 2]]  # 1
+    ]
+
+  layer2: 
+    [
+      [BasicBlock, [128, 64, 2]], # 0
+      [BasicBlock, [128, 128, 2]] # 1
+    ]
+  
+  layer3: 
+    [
+      [BasicBlock, [256, 128, 2]], # 0
+      [BasicBlock, [256, 256, 2]]  # 1
+    ]
+
+  layer4: 
+    [
+      [BasicBlock, [512, 256, 2]], # 0
+      [BasicBlock, [512, 512, 2]]  # 1
+    ]
+  
+  avgpool: 
+    [
+      [AdaptiveAvgPool, [1, 1]] # 0
+    ]
+
+  fc: 
+    [
+      [Linear, [1000, 512]] # 0
+    ]
+  

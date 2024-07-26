@@ -1,79 +1,107 @@
+import os
+import yaml
 import torch
 import torch.nn as nn
-import yaml
-from layers import *
+from torchvision.models import VGG16_BN_Weights
 
-# Helper function to create a layer from the config
-def create_layer(layer_type, in_channels, params):
-    if layer_type == 'Conv':
+def make_layer(layer, in_channels, params):
+    if layer == 'Conv':
         out_channels, kernel_size, stride, padding = params
-        return nn.Conv2d(in_channels=in_channels, out_channels=out_channels, kernel_size=kernel_size, stride=stride, padding=padding), out_channels
-    elif layer_type == 'MaxPool':
+        return nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding), out_channels
+    elif layer == 'MaxPool':
         kernel_size, stride, padding = params
         return nn.MaxPool2d(kernel_size=kernel_size, stride=stride, padding=padding), in_channels
-    elif layer_type == 'Linear':
-        out_features = params[0]
-        return nn.Linear(in_features=in_channels, out_features=out_features), out_features
-    elif layer_type == 'ReLU':
+    elif layer == 'ReLU':
         return nn.ReLU(inplace=True), in_channels
-    elif layer_type == 'Dropout':
+    elif layer == 'SiLU':
+        return nn.SiLU(inplace=True), in_channels
+    elif layer == 'Dropout':
         p = params[0]
         return nn.Dropout(p=p), in_channels
-    elif layer_type == 'Softmax':
+    elif layer == 'Linear':
+        out_features = params[0]
+        return nn.Linear(in_features=in_channels, out_features=out_features), out_features
+    elif layer == 'Softmax':
         return nn.Softmax(dim=1), in_channels
+    elif layer == 'BatchNorm':
+        num_features = params[0]
+        return nn.BatchNorm2d(num_features), in_channels
+    elif layer == 'AdaptiveAvgPool':
+        output_size = params
+        return nn.AdaptiveAvgPool2d(output_size), in_channels
     else:
-        raise ValueError(f"Unknown layer type: {layer_type}")
+        raise ValueError(f"Unsupported layer type: {layer}")
 
-# VGG16 Model
 class VGG(nn.Module):
-    def __init__(self, config):
+    def __init__(self, model='vgg16', num_classes=1000, in_channels=3):
         super(VGG, self).__init__()
-        self.layers, self.in_features = self._create_layers(config)
-        self.num_classes = config['nc']
-        self.fc_layers = self._create_fc_layers(config['head'], self.num_classes)
+        self.model = model
+        self.num_classes = num_classes
+        self.in_channels = in_channels
+        
+        config_path = os.path.join(os.path.dirname(__file__), 'config', f'{model}.yaml')
+        
+        try:
+            with open(config_path, 'r') as file:
+                self.config = yaml.load(file, Loader=yaml.FullLoader)
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Configuration file for model '{model}' not found at path: {config_path}")
+        except yaml.YAMLError as exc:
+            raise ValueError(f"Error parsing YAML file for model '{model}': {exc}")
 
-    def _create_layers(self, config):
+        self.features = self.make_layers(self.config, 'features')
+        self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
+        self.classifier = nn.Sequential(
+            nn.Linear(in_features=512*7*7, out_features=4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.5),
+            nn.Linear(in_features=4096, out_features=4096),
+            nn.ReLU(inplace=True),
+            nn.Dropout(p=0.5),
+            nn.Linear(in_features=4096, out_features=num_classes)
+        )
+
+    def make_layers(self, config, layer):
         layers = []
-        in_channels = 3  # Initial input channels (e.g., RGB image)
+        in_channels = self.in_channels
 
-        # Backbone layers
-        for layer_config in config['backbone']:
-            idx, repeat, layer_type, params = layer_config
-            layer, in_channels = create_layer(layer_type, in_channels, params)
+        for layer_config in config[layer]:
+            layer_type, params = layer_config
+            layer, in_channels = make_layer(layer_type, in_channels, params)
             layers.append(layer)
-
-        # Flatten layer before fully connected layers
-        layers.append(nn.Flatten())
-        in_features = in_channels * 7 * 7  # Assuming input image size is 224x224 and feature maps are downsampled by 32
-
-        return nn.Sequential(*layers), in_features
-
-    def _create_fc_layers(self, head_config, num_classes):
-        layers = []
-        in_features = self.in_features  # Use in_features calculated from _create_layers
-        for layer_config in head_config:
-            idx, repeat, layer_type, params = layer_config
-            if layer_type == 'Linear' and params[0] == 'nc':
-                params[0] = num_classes  # Convert 'nc' to actual number of classes
-            print(f"Creating {layer_type} layer with in_features: {in_features}, params: {params}")  # Debug statement
-            layer, in_features = create_layer(layer_type, in_features, params)
-            layers.append(layer)
+        
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        x = self.layers(x)
-        x = self.fc_layers(x)
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        
         return x
 
-# Load config
-with open('/Users/fontana/Desktop/research/deep-learning-cv/src/models/classification/vgg/vgg16.yaml', 'r') as f:
-    config = yaml.safe_load(f)
+    def compile(self):
+        pass
 
-# Create model
-model = VGG(config)
-print(model)
+    def fit(self):
+        pass
 
-# Example usage
-x = torch.randn(1, 3, 224, 224)  # Example input
-output = model(x)
-print(output.shape)
+    def evaluate(self):
+        pass
+
+    def predict(self):
+        pass
+
+def main():
+    model = VGG(model='vgg16', num_classes=1000, in_channels=3)
+    print(model)
+
+    weights = VGG16_BN_Weights.IMAGENET1K_V1
+    model.load_state_dict(weights.get_state_dict())
+        
+    x = torch.randn(1, 3, 224, 224)  # Example input
+    output = model(x)
+    print(output.shape)
+
+if __name__ == '__main__':
+    main()

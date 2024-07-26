@@ -1,4 +1,4 @@
-class YOLOv9():
+class YOLO():
     def __init__(self):
         pass
         

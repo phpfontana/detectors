@@ -1,5 +1,7 @@
 import torch
 import torch.nn as nn
+import yaml
+
 
 class ConvBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size, stride, padding):
@@ -18,6 +20,14 @@ class MaxPoolBlock(nn.Module):
 
     def forward(self, x):
         return self.pool(x)
+    
+class DropoutBlock(nn.Module):
+    def __init__(self, p):
+        super(DropoutBlock, self).__init__()
+        self.dropout = nn.Dropout(p=p)
+
+    def forward(self, x):
+        return self.dropout(x)
 
 class LinearBlock(nn.Module):
     def __init__(self, in_features, out_features, last_layer=False):
