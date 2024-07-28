@@ -2,7 +2,8 @@ import os
 import yaml
 import torch
 import torch.nn as nn
-from torchvision.models import VGG16_BN_Weights
+from torchvision.models import VGG16_BN_Weights, vgg16_bn
+from PIL import Image
 
 def make_layer(layer, in_channels, params):
     if layer == 'Conv':
@@ -33,7 +34,7 @@ def make_layer(layer, in_channels, params):
         raise ValueError(f"Unsupported layer type: {layer}")
 
 class VGG(nn.Module):
-    def __init__(self, model='vgg16', num_classes=1000, in_channels=3):
+    def __init__(self, weights=None, model='vgg16', num_classes=1000, in_channels=3):
         super(VGG, self).__init__()
         self.model = model
         self.num_classes = num_classes
@@ -93,15 +94,31 @@ class VGG(nn.Module):
         pass
 
 def main():
-    model = VGG(model='vgg16', num_classes=1000, in_channels=3)
-    print(model)
-
     weights = VGG16_BN_Weights.IMAGENET1K_V1
+    img_path = os.path.join(os.path.dirname(__file__), 'test.jpeg')
+    img = Image.open(img_path)
+    
+    model = VGG(model='vgg16', num_classes=1000, in_channels=3)
     model.load_state_dict(weights.get_state_dict())
-        
-    x = torch.randn(1, 3, 224, 224)  # Example input
+
+    torch_model = vgg16_bn(weights=weights)
+
+    transforms = weights.transforms()
+
+    img_transformed = transforms(img)
+
+    x = img_transformed.unsqueeze(0) # (1, 3, 224, 224)
+    
     output = model(x)
+    torch_output = torch_model(x)
     print(output.shape)
+    print(torch_output.shape)
+
+    class_idx = torch.argmax(output, dim=1).item()
+    torch_class_idx = torch.argmax(torch_output, dim=1).item()
+
+    print(f"Class index: {class_idx}")
+    print(f"Torch class index: {torch_class_idx}")
 
 if __name__ == '__main__':
     main()
