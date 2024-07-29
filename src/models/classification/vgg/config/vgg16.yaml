@@ -1,3 +1,5 @@
+nc: 1000
+
 features : 
   [
     [Conv, [64, 3, 1, 1]],   # 0: Conv2d with 3 input channels, 64 filters, 3x3 kernel, stride 1, padding 1
@@ -53,11 +55,11 @@ avgpool :
 
 classifier : 
   [
-    [Linear, [25088, 4096]],  # 0: Fully connected layer with 25088 input features and 4096 output features
+    [Linear, [4096]],  # 0: Fully connected layer with 25088 input features and 4096 output features
     [ReLU, []],               # 1: ReLU activation
     [Dropout, [0.5]],         # 2: Dropout with probability 0.5
-    [Linear, [4096, 4096]],   # 3: Fully connected layer with 4096 input features and 4096 output features
+    [Linear, [4096]],   # 3: Fully connected layer with 4096 input features and 4096 output features
     [ReLU, []],               # 4: ReLU activation
     [Dropout, [0.5]],         # 5: Dropout with probability 0.5
-    [Linear, [4096, 1000]]    # 6: Fully connected layer with 4096 input features and 1000 output features
+    [Linear, [nc]]    # 6: Fully connected layer with 4096 input features and 1000 output features
   ]

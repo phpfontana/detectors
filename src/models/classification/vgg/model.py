@@ -28,70 +28,86 @@ def make_layer(layer, in_channels, params):
         num_features = params[0]
         return nn.BatchNorm2d(num_features), in_channels
     elif layer == 'AdaptiveAvgPool':
-        output_size = params
+        output_size = params[0]
         return nn.AdaptiveAvgPool2d(output_size), in_channels
     else:
         raise ValueError(f"Unsupported layer type: {layer}")
 
+def _make_layers(config, layer, in_channels):
+    layers = []
+    for layer_config in config[layer]:
+        layer_type, params = layer_config
+        layer, in_channels = make_layer(layer_type, in_channels, params)
+        layers.append(layer)
+    return nn.Sequential(*layers), in_channels
+
+def load_yaml_config(config_path):
+    try:
+        with open(config_path, 'r') as file:
+            config = yaml.load(file, Loader=yaml.FullLoader)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Configuration not found at path: {config_path}")
+    except yaml.YAMLError as exc:
+        raise ValueError(f"Error parsing YAML file: {exc}")
+    
+    return config
+
 class VGG(nn.Module):
-    def __init__(self, weights=None, model='vgg16', num_classes=1000, in_channels=3):
+    def __init__(self, model='vgg16', num_classes=1000, in_channels=3):
         super(VGG, self).__init__()
         self.model = model
         self.num_classes = num_classes
         self.in_channels = in_channels
-        
+
+        # Load configuration
         config_path = os.path.join(os.path.dirname(__file__), 'config', f'{model}.yaml')
-        
-        try:
-            with open(config_path, 'r') as file:
-                self.config = yaml.load(file, Loader=yaml.FullLoader)
-        except FileNotFoundError:
-            raise FileNotFoundError(f"Configuration file for model '{model}' not found at path: {config_path}")
-        except yaml.YAMLError as exc:
-            raise ValueError(f"Error parsing YAML file for model '{model}': {exc}")
+        self.config = load_yaml_config(config_path)
 
-        self.features = self.make_layers(self.config, 'features')
-        self.avgpool = nn.AdaptiveAvgPool2d((7, 7))
-        self.classifier = nn.Sequential(
-            nn.Linear(in_features=512*7*7, out_features=4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5),
-            nn.Linear(in_features=4096, out_features=4096),
-            nn.ReLU(inplace=True),
-            nn.Dropout(p=0.5),
-            nn.Linear(in_features=4096, out_features=num_classes)
-        )
+        # Update num_classes in config
+        for idx, (layer_type, params) in enumerate(self.config['classifier']):
+            if layer_type == 'Linear' and params[0] == 'nc':
+                self.config['classifier'][idx][1][0] = self.num_classes
 
-    def make_layers(self, config, layer):
-        layers = []
-        in_channels = self.in_channels
-
-        for layer_config in config[layer]:
-            layer_type, params = layer_config
-            layer, in_channels = make_layer(layer_type, in_channels, params)
-            layers.append(layer)
-        
-        return nn.Sequential(*layers)
+        # Build layers
+        self.features, in_channels = _make_layers(self.config, 'features', self.in_channels)
+        self.avgpool, in_channels = _make_layers(self.config, 'avgpool', in_channels)
+        self.classifier, _ = _make_layers(self.config, 'classifier', in_channels*7*7)
 
     def forward(self, x):
         x = self.features(x)
         x = self.avgpool(x)
         x = torch.flatten(x, 1)
         x = self.classifier(x)
-        
         return x
 
-    def compile(self):
-        pass
+    def compile(self, optimizer, loss_fn, metrics):
+        self.optimizer = optimizer
+        self.loss_fn = loss_fn
+        self.metrics = metrics
 
-    def fit(self):
-        pass
+    def fit(self, train_loader, val_loader, epochs):
+        for epoch in range(epochs):
+            for x, y in train_loader:
+                self.optimizer.zero_grad()
+                output = self(x)
+                loss = self.loss_fn(output, y)
+                loss.backward()
+                self.optimizer.step()
+            
+            for x, y in val_loader:
+                output = self(x)
+                loss = self.loss_fn(output, y)
+                self.metrics.update(output, y)
 
-    def evaluate(self):
-        pass
+            print(f"Epoch: {epoch}, Loss: {loss.item()}, Metrics: {self.metrics}")
 
-    def predict(self):
-        pass
+    def evaluate(self, test_loader):
+        for x, y in test_loader:
+            output = self(x)
+            loss = self.loss_fn(output, y)
+            self.metrics.update(output, y)
+        
+        print(f"Test Metrics: {self.metrics}")
 
 def main():
     weights = VGG16_BN_Weights.IMAGENET1K_V1
@@ -100,8 +116,10 @@ def main():
     
     model = VGG(model='vgg16', num_classes=1000, in_channels=3)
     model.load_state_dict(weights.get_state_dict())
+    print(model)
 
     torch_model = vgg16_bn(weights=weights)
+    print(torch_model)
 
     transforms = weights.transforms()
 
