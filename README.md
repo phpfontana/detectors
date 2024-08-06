@@ -1,2 +1,2 @@
-# deep-learning-cv
-Deep Learning for computer vision with PyTorch
+# Detectors
+State-of-the-art object detection, segmentation, and tracking implemented with PyTorch.
