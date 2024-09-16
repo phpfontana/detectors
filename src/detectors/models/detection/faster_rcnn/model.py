@@ -13,8 +13,8 @@ def faster_rcnn(backbone: torch.nn.Module, num_classes: int = 1000) -> FasterRCN
         FasterRCNN: 
     """
 
-    backbone = backbone.feature_extractor
-    
+    backbone = torch.nn.Sequential(*list(backbone.children())[:-1])
+
     feature_maps = backbone(torch.randn(1, 3, 224, 224))
 
     backbone.out_channels = feature_maps.shape[1]

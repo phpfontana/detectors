@@ -179,21 +179,16 @@ class ResNet(nn.Module):
         self.groups = groups
         self.base_width = width_per_group
 
-        # Feature extractor
-        self.feature_extractor = nn.Sequential(
-            nn.Conv2d(3, self.in_planes, kernel_size=7, stride=2, padding=3, bias=False),
-            norm_layer(self.in_planes),
-            nn.ReLU(inplace=True),
-            nn.MaxPool2d(kernel_size=3, stride=2, padding=1),
-            self._make_layer(block, 64, layers[0]),
-            self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0]),
-            self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1]),
-            self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2]),
-            nn.AdaptiveAvgPool2d((1, 1))
-        )
-
-        # Classifier
-        self.classifier = nn.Linear(512 * block.expansion, num_classes)
+        self.conv1 = nn.Conv2d(3, self.in_planes, kernel_size=7, stride=2, padding=3, bias=False)
+        self.bn1 = norm_layer(self.in_planes)
+        self.relu = nn.ReLU(inplace=True)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
+        self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
+        self.layer4 = self._make_layer(block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(512 * block.expansion, num_classes)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -210,6 +205,7 @@ class ResNet(nn.Module):
                     nn.init.constant_(m.bn3.weight, 0)  
                 elif isinstance(m, BasicBlock) and m.bn2.weight is not None:
                     nn.init.constant_(m.bn2.weight, 0)  
+
 
     def _make_layer(
             self,
@@ -261,11 +257,21 @@ class ResNet(nn.Module):
             )
         
         return nn.Sequential(*layers)
-
+    
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = self.feature_extractor(x)
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
         x = torch.flatten(x, 1)
-        x = self.classifier(x)
+        x = self.fc(x)
 
         return x
 
@@ -288,12 +294,15 @@ def resnet152(num_classes: int = 1000, weights: Optional[Any] = None) -> ResNet:
 
 def main():
     model = resnet50()
+    weights = ResNet50_Weights.IMAGENET1K_V2
+
+    model.load_state_dict(weights.get_state_dict())
+
     pprint(model)
 
     x = torch.randn(1, 3, 224, 224)
 
-    with torch.no_grad():
-        out = model(x)
+    out = model(x)
 
     print(out.shape)
 

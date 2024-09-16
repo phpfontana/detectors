@@ -12,7 +12,7 @@ def mask_rcnn(backbone: torch.nn.Module, num_classes: int = 1000) -> torchvision
         torchvision.models.detection.MaskRCNN: 
     """
 
-    backbone = backbone.feature_extractor
+    backbone = torch.nn.Sequential(*list(backbone.children())[:-1])
     
     feature_maps = backbone(torch.randn(1, 3, 224, 224))
 
