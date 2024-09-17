@@ -1,32 +1,72 @@
 import torch
 import torchvision
+from typing import Tuple
 from torchvision.models.detection import FasterRCNN
 from torchvision.models.detection.rpn import AnchorGenerator
 
-def faster_rcnn(backbone: torch.nn.Module, num_classes: int = 1000) -> FasterRCNN:
+
+def faster_rcnn(backbone: torch.nn.Module, num_classes: int = 91, min_size: int = 800, max_size: int = 1333, anchor_sizes: Tuple[Tuple[int, ...], ...] = ((32, 64, 128, 256, 512),), aspect_ratios: Tuple[Tuple[float, ...], ...] = ((0.5, 1.0, 2.0),)) -> FasterRCNN:
     """
+    Create a Faster R-CNN model with a custom backbone.
+
     Args:
-        backbone (torch.nn.Module): 
-        num_classes (int): 
+        backbone (torch.nn.Module): The backbone network to use in the Faster R-CNN model.
+        num_classes (int): Number of output classes of the model (including the background).
+        min_size (int): Minimum size of the image to be rescaled before feeding it to the backbone.
+        max_size (int): Maximum size of the image to be rescaled before feeding it to the backbone.
+        anchor_sizes (Tuple[Tuple[int, ...], ...]): Sizes of anchors for each feature map.
+        aspect_ratios (Tuple[Tuple[float, ...], ...]): Aspect ratios of anchors for each feature map.
 
     Returns:
-        FasterRCNN: 
+        FasterRCNN: The constructed Faster R-CNN model.
     """
 
+    # remove the last layer of the backbone
     backbone = torch.nn.Sequential(*list(backbone.children())[:-1])
 
+    # pass a dummy input through the backbone to get the number of output channels
     feature_maps = backbone(torch.randn(1, 3, 224, 224))
 
-    backbone.out_channels = feature_maps.shape[1]
+    # set the number of output channels in the backbone
+    backbone.out_channels = feature_maps.shape[1]   
 
-    anchor_generator = AnchorGenerator(sizes=((32, 64, 128, 256, 512),), aspect_ratios=((0.5, 1.0, 2.0),))
+    # create the anchor generator
+    anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
 
+    # create the ROI pooler
     roi_pooler = torchvision.ops.MultiScaleRoIAlign(featmap_names=['0'], output_size=7, sampling_ratio=2)
     
-    return FasterRCNN(backbone, num_classes, rpn_anchor_generator=anchor_generator, box_roi_pool=roi_pooler)
+    return FasterRCNN(backbone, 
+                       num_classes=num_classes,
+                       rpn_anchor_generator=anchor_generator,
+                       box_roi_pool=roi_pooler,
+                       min_size=min_size,
+                       max_size=max_size)
 
 def main():
-    pass
+    # load backbone
+    backbone = torchvision.models.efficientnet_v2_s(weights="DEFAULT")
+
+    # load mask rcnn model
+    model = faster_rcnn(backbone, 91)
+    print(model)
+    
+    # set the model to evaluation mode to avoid needing targets
+    model.eval()
+
+    # warmup pass
+    with torch.no_grad():
+        x = torch.randn(1, 3, 224, 224)
+        out = model(x)
+
+    # draw bounding boxes
+    boxes = out[0]['boxes']
+    labels = out[0]['labels']
+    scores = out[0]['scores']
+
+    print(boxes)
+    print(labels)
+    print(scores)
 
 if __name__ == '__main__':
     main()
